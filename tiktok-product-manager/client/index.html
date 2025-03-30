@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý Sản phẩm TikTok</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://unpkg.com/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+  <script src="https://unpkg.com/@yaireo/tagify"></script>
+  <script src="https://unpkg.com/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    /* Add custom styles if needed, e.g., for the card actions dropdown */
+    .card-actions-menu {
+        position: absolute;
+        right: 0;
+        top: 100%;
+        margin-top: 0.25rem;
+        z-index: 10;
+        /* Add other styles like background, shadow, padding */
+    }
+    /* Removed custom media query */
+    /* Change Tagify tag text color to black on hover for better contrast */
+    .tagify__tag:hover .tagify__tag-text {
+      color: #000000 !important; /* Use !important to ensure override */
+    }
+
+    /* Custom orientation handling for product grid */
+    @media (min-width: 640px) and (orientation: portrait) {
+      #product-cards-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr)); /* Force 2 columns for sm+ portrait */
+      }
+    }
+    /* Styles for Stat Filter Buttons */
+    .stat-btn-pending {
+      background-color: #FEF9C3; /* Tailwind yellow-100 */
+      color: #713F12; /* Tailwind yellow-900 */
+      border-color: #FDE68A; /* Tailwind yellow-200 */
+    }
+    .stat-btn-pending:hover {
+      background-color: #FEF08A; /* Tailwind yellow-200 */
+    }
+    .stat-btn-purchased {
+      background-color: #DCFCE7; /* Tailwind green-100 */
+      color: #14532D; /* Tailwind green-900 */
+      border-color: #BBF7D0; /* Tailwind green-200 */
+    }
+    .stat-btn-purchased:hover {
+      background-color: #BBF7D0; /* Tailwind green-200 */
+    }
+    /* Style for active filter button (using data attribute) */
+    .stat-filter-btn[data-active='true'] {
+      /* Example: Use Tailwind ring utility classes via JS if preferred,
+         or define custom styles here */
+      box-shadow: 0 0 0 2px #60A5FA; /* Tailwind blue-400 ring */
+      border-color: #3B82F6; /* Tailwind blue-500 */
+    }
+
+
+    /* Responsive adjustments for smaller screens */
+    @media (max-width: 768px) { 
+        /* Toolbar buttons */
+        #open-filter-modal-btn,
+        .stat-filter-btn,
+        #manage-tags-btn,
+        #add-product-btn {
+            font-size: 0.75rem; /* text-xs */
+            padding-left: 0.5rem; /* px-2 */
+            padding-right: 0.5rem; /* px-2 */
+            padding-top: 0.25rem; /* py-1 */
+            padding-bottom: 0.25rem; /* py-1 */
+            white-space: nowrap;
+            height: auto; /* Allow height to adjust */
+        }
+
+        /* Make stat buttons smaller */
+        .stat-filter-btn {
+             font-size: 0.625rem; /* Smaller than text-xs */
+             padding-left: 0.5rem; /* px-2 */
+             padding-right: 0.5rem; /* px-2 */
+             padding-top: 0.125rem; /* py-0.5 */
+             padding-bottom: 0.125rem; /* py-0.5 */
+        }
+
+        /* Reduce gap between stat buttons */
+        #product-stats-container {
+             gap: 0.25rem; /* space-x-1 */
+        }
+
+        /* Allow wrapping for the main toolbar container */
+        #products-content > .flex.items-center.justify-between {
+            flex-wrap: wrap;
+            gap: 0.5rem; /* Add gap when wrapping */
+            justify-content: flex-start; /* Align items to start when wrapping */
+        }
+
+        /* Ensure right-side buttons group doesn't prevent wrapping */
+        #products-content > .flex.items-center.justify-between > .flex.gap-2 {
+             flex-shrink: 0; /* Prevent this group from shrinking */
+        }
+
+        /* Product card status badge */
+        .product-card span[data-action="toggle-purchase"] {
+             white-space: nowrap;
+        }
+
+
+
+    /* Reduce sidebar width on medium/large tablets */
+    @media (max-width: 1024px) {
+        aside.w-64 {
+            /* Sidebar width is now controlled by max-width: 768px rule below */
+        }
+    }
+
+    /* Further adjustments for tablet portrait / mobile */
+    @media (max-width: 768px) {
+        /* Make sidebar icon-only */
+        aside.w-64 {
+             width: 4rem; /* w-16 */
+        }
+        aside nav a span {
+             display: none; /* Hide text labels */
+        }
+        aside nav a {
+             justify-content: center; /* Center icons */
+             padding-left: 0.5rem; /* px-2 */
+             padding-right: 0.5rem; /* px-2 */
+        }
+    }
+
+
+        /* Allow wrapping for the main toolbar container if still too tight */
+        #products-content > .flex.items-center.justify-between {
+            flex-wrap: wrap;
+            gap: 0.5rem; /* Add gap when wrapping */
+        }
+
+        /* Product card status badge */
+        .product-card span[data-action="toggle-purchase"] {
+             white-space: nowrap;
+        }
+    }
+
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="app">
+    <!-- Auth Section -->
+    <div id="auth-section" class="min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-md bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6">
+          <div class="flex justify-center mb-6">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#3B82F6" stroke-width="2"/><path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14M9 9H9.01M15 9H15.01" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">Quản lý Sản phẩm TikTok</h2>
+          <form id="login-form" class="space-y-4">
+            <div><label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="email" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="your@email.com" required></div>
+            <div><label for="password" class="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label><input type="password" id="password" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••" required></div>
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Đăng nhập</button>
+          </form>
+          <div class="relative my-6"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div><div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-gray-500">Or</span></div></div>
+          <button id="show-register" class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Create new account</button>
+          <form id="register-form" class="hidden space-y-4">
+            <div><label for="register-name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" id="register-name" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+            <div><label for="register-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="register-email" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+            <div><label for="register-password" class="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label><input type="password" id="register-password" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Register</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Section (hidden by default) -->
+    <div id="dashboard-section" class="hidden min-h-screen flex flex-col">
+      <header class="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6">
+        <div class="flex items-center gap-2"><span class="text-lg font-semibold">TikTok Manager</span></div>
+        <div class="ml-auto flex items-center gap-4"><button id="logout-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4"><i data-lucide="log-out" class="mr-2 h-4 w-4"></i>Đăng xuất</button></div>
+      </header>
+      <div class="flex flex-1">
+        <aside class="hidden border-r bg-gray-50 md:block w-64">
+          <div class="flex h-full max-h-screen flex-col gap-2">
+            <div class="flex-1 py-2">
+              <nav class="grid items-start px-2 text-sm font-medium lg:px-4">
+                <a href="#" id="dashboard-tab" class="flex items-center gap-3 rounded-lg px-3 py-2 bg-gray-100 text-blue-600 transition-all"><i data-lucide="home" class="h-4 w-4"></i>Bảng điều khiển</a>
+                <a href="#" id="products-tab" class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:text-blue-600 transition-all"><i data-lucide="shopping-cart" class="h-4 w-4"></i>Sản phẩm</a>
+                <a href="#" id="goals-tab" class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:text-blue-600 transition-all"><i data-lucide="target" class="h-4 w-4"></i>Mục tiêu</a>
+                <a href="#" id="trash-tab" class="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:text-blue-600 transition-all"><i data-lucide="trash-2" class="h-4 w-4"></i>Thùng rác</a>
+              </nav>
+            </div>
+          </div>
+        </aside>
+        <main class="flex-1 p-4 md:p-6">
+          <div id="dashboard-content">
+            <!-- Stats Cards -->
+            <div id="dashboard-stats-cards" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-medium text-gray-500">Tổng số sản phẩm</h3>
+                    <p id="stat-total-products" class="text-2xl font-semibold mt-1">--</p>
+                  </div>
+                  <div class="rounded-lg bg-blue-100 p-3"><i data-lucide="shopping-cart" class="h-5 w-5 text-blue-600"></i></div>
+                </div>
+                <div class="mt-4">
+                  <div class="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Đã mua</span>
+                    <span id="stat-purchased-ratio">--/--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="stat-purchased-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div></div>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-medium text-gray-500">Video đã quay</h3>
+                    <p id="stat-total-videos" class="text-2xl font-semibold mt-1">--</p>
+                  </div>
+                  <div class="rounded-lg bg-green-100 p-3"><i data-lucide="film" class="h-5 w-5 text-green-600"></i></div>
+                </div>
+                <div class="mt-4">
+                  <div class="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Tháng này</span>
+                    <span id="stat-videos-month-ratio">--/--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="stat-videos-month-bar" class="bg-green-600 h-2 rounded-full" style="width: 0%"></div></div>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-medium text-gray-500">Mục tiêu tháng</h3>
+                    <p id="stat-goal-percentage" class="text-2xl font-semibold mt-1">--%</p>
+                  </div>
+                  <div class="rounded-lg bg-purple-100 p-3"><i data-lucide="target" class="h-5 w-5 text-purple-600"></i></div>
+                </div>
+                <div class="mt-4">
+                  <div class="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Tiến độ</span>
+                    <span id="stat-goal-ratio">--/--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="stat-goal-bar" class="bg-purple-600 h-2 rounded-full" style="width: 0%"></div></div>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-medium text-gray-500">Trong thùng rác</h3>
+                    <p id="stat-trash-count" class="text-2xl font-semibold mt-1">--</p>
+                  </div>
+                  <div class="rounded-lg bg-red-100 p-3"><i data-lucide="trash-2" class="h-5 w-5 text-red-600"></i></div>
+                </div>
+                <!-- Optional: Add progress/info for trash if needed -->
+              </div>
+            </div>
+
+            <!-- Recent Products & Monthly Goals -->
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-lg font-semibold">Sản phẩm gần đây</h2>
+                  <button id="view-all-products-btn" class="text-sm text-blue-600 hover:underline">Xem tất cả</button>
+                </div>
+                <div id="dashboard-recent-products" class="space-y-4">
+                  <!-- Recent products will be loaded here -->
+                  <p class="text-sm text-gray-500">Loading recent products...</p>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 id="dashboard-monthly-goal-title" class="text-lg font-semibold">Mục tiêu Tháng</h2>
+                  <button id="edit-goals-btn" class="inline-flex items-center justify-center text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"><i data-lucide="plus" class="mr-2 h-4 w-4"></i>Sửa Mục tiêu</button>
+                </div>
+                <div id="dashboard-monthly-goal-details" class="space-y-4">
+                  <!-- Monthly goal details will be loaded here -->
+                   <p class="text-sm text-gray-500">Loading goal details...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="products-content" class="hidden">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-2">
+                 <h2 class="text-2xl font-semibold hidden">Sản phẩm</h2>
+                 <button id="open-filter-modal-btn" class="relative inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-white text-gray-700 hover:bg-gray-50 h-10 py-2 px-4 ml-4">
+                    <i data-lucide="filter" class="mr-2 h-4 w-4"></i>Filter
+                    <span id="filter-count-badge" class="absolute -top-1 -right-1 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full hidden">0</span>
+                 </button>
+                 <!-- Thêm phần tử thống kê -->
+                 <div id="product-stats-container" class="flex space-x-2 ml-4">
+                     <button id="stat-total-btn" class="stat-filter-btn px-3 py-1 text-sm border rounded-md hover:bg-gray-100 data-[active='true']:border-blue-500 data-[active='true']:ring-1 data-[active='true']:ring-blue-300" data-filter-status="">
+                         Tổng: <span id="stat-total-count" class="font-medium">0</span>
+                     </button>
+                     <button id="stat-pending-btn" class="stat-filter-btn stat-btn-pending px-3 py-1 text-sm border rounded-md hover:opacity-90 data-[active='true']:border-yellow-500 data-[active='true']:ring-1 data-[active='true']:ring-yellow-300" data-filter-status="false">
+                         Đang chờ: <span id="stat-pending-count" class="font-medium">0</span>
+                     </button>
+                     <button id="stat-purchased-btn" class="stat-filter-btn stat-btn-purchased px-3 py-1 text-sm border rounded-md hover:opacity-90 data-[active='true']:border-green-500 data-[active='true']:ring-1 data-[active='true']:ring-green-300" data-filter-status="true">
+                         Đã mua: <span id="stat-purchased-count" class="font-medium">0</span>
+                     </button>
+                 </div>
+              </div>
+              <div class="flex gap-2">
+                 <button id="manage-tags-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-white text-gray-700 hover:bg-gray-50 h-10 py-2 px-4"><i data-lucide="tags" class="mr-2 h-4 w-4"></i>Tags</button>
+                 <button id="add-product-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 h-10 py-2 px-4"><i data-lucide="plus" class="mr-2 h-4 w-4"></i>Thêm SP</button>
+              </div>
+            </div>
+
+            <!-- Table Container Removed -->
+
+            <!-- Card Container - Removed responsive classes -->
+            <div id="product-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Product cards will be loaded here by JS -->
+                <!-- Example Card Structure (for reference, will be generated by JS):
+                <div class="bg-white rounded-lg border shadow-sm p-4 flex flex-col space-y-3">
+                    <div class="relative">
+                        <img src="https://via.placeholder.com/150" alt="Product" class="product-image w-full h-48 object-cover rounded-md">
+                        <button class="absolute top-2 right-2 p-1 bg-white rounded-full shadow text-gray-600 hover:text-gray-900">
+                            <i data-lucide="more-vertical" class="h-4 w-4"></i>
+                        </button>
+                         Dropdown menu for actions here
+                    </div>
+                    <a href="#" target="_blank" class="text-sm font-medium text-blue-600 hover:underline truncate">https://www.tiktok.com/...</a>
+                    <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 w-fit">Purchased</span>
+                    <div>
+                        <input class="inline-tagify-input block w-full text-sm ..." placeholder="Add tags...">
+                    </div>
+                    <div>
+                        <textarea class="inline-notes-textarea block w-full text-sm ..." rows="2" placeholder="Add notes..."></textarea>
+                    </div>
+                </div>
+                 -->
+            </div>
+
+            <!-- Pagination Controls Container -->
+            <div id="pagination-controls" class="mt-4 flex justify-center items-center space-x-2"></div>
+          </div>
+          <div id="goals-content" class="hidden">
+             <div class="flex items-center justify-between mb-6"><h2 class="text-2xl font-semibold">Mục tiêu</h2><button id="add-goal-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-blue-600 text-white hover:bg-blue-700 h-10 py-2 px-4"><i data-lucide="plus" class="mr-2 h-4 w-4"></i>Add/Update Goal</button></div>
+             <div id="goals-list" class="space-y-4"></div>
+          </div>
+          <div id="trash-content" class="hidden">
+            <div class="flex items-center justify-between mb-6"><h2 class="text-2xl font-semibold">Thùng rác</h2></div>
+            <div class="rounded-xl border bg-white shadow-sm overflow-hidden"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sản phẩm</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đã xóa lúc</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th></tr></thead><tbody id="trash-list" class="bg-white divide-y divide-gray-200"></tbody></table></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-product-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-medium text-gray-900">Thêm sản phẩm mới</h3><button id="close-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <form id="add-product-form" class="space-y-4">
+          <div><label for="product-url" class="block text-sm font-medium text-gray-700 mb-1">URL TikTok</label><input type="url" id="product-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="https://www.tiktok.com/..." required></div>
+          <div>
+            <label for="product-image-url" class="block text-sm font-medium text-gray-700 mb-1">Hình ảnh (Dán từ Clipboard hoặc Tải lên)</label>
+            <input type="text" id="product-image-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Dán hình ảnh vào đây hoặc sử dụng nút tải lên">
+            <input type="file" id="product-image-upload" accept="image/*" class="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            <img id="product-image-preview" src="" alt="Image Preview" class="product-image mt-2 w-full h-auto max-h-72 object-contain hidden cursor-pointer" title="Click to zoom">
+          </div>
+          <div><label for="product-notes" class="block text-sm font-medium text-gray-700 mb-1">Ghi chú (Tùy chọn)</label><textarea id="product-notes" rows="3" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+          <!-- <div><label for="product-tags" class="block text-sm font-medium text-gray-700 mb-1">Tags (Optional, comma-separated)</label><input type="text" id="product-tags" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="fashion, summer, ..."></div> -->
+          <div>
+            <label for="add-product-tags-input" class="block text-sm font-medium text-gray-700 mb-1">Thẻ (Tùy chọn)</label>
+            <input id="add-product-tags-input" name="add-product-tags-input" placeholder="Type or select tags..." class="block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Thêm sản phẩm</button>
+        </form>
+      </div>
+    </div>
+    <div id="edit-product-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-medium text-gray-900">Sửa sản phẩm</h3><button id="close-edit-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <form id="edit-product-form" class="space-y-4">
+          <input type="hidden" id="edit-product-id">
+          <div><label for="edit-product-url" class="block text-sm font-medium text-gray-700 mb-1">URL TikTok</label><input type="url" id="edit-product-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+          <div>
+            <label for="edit-product-image-url" class="block text-sm font-medium text-gray-700 mb-1">Hình ảnh (Dán từ Clipboard hoặc Tải lên)</label>
+            <input type="text" id="edit-product-image-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Dán hình ảnh vào đây hoặc sử dụng nút tải lên"> {/* Changed type to text */}
+            <input type="file" id="edit-product-image-upload" accept="image/*" class="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            <img id="edit-product-image-preview" src="" alt="Image Preview" class="product-image mt-2 w-full h-auto max-h-72 object-contain hidden cursor-pointer" title="Click to zoom">
+          </div>
+          <div><label for="edit-product-notes" class="block text-sm font-medium text-gray-700 mb-1">Ghi chú (Tùy chọn)</label><textarea id="edit-product-notes" rows="3" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+          <!-- <div><label for="edit-product-tags" class="block text-sm font-medium text-gray-700 mb-1">Tags (Optional, comma-separated)</label><input type="text" id="edit-product-tags" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div> -->
+          <div>
+            <label for="edit-product-tags-input" class="block text-sm font-medium text-gray-700 mb-1">Thẻ (Tùy chọn)</label>
+            <input id="edit-product-tags-input" name="edit-product-tags-input" placeholder="Type or select tags..." class="block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+          </div>
+           <div><label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label><select id="edit-product-purchased" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"><option value="false">Đang chờ</option><option value="true">Đã mua</option></select></div>
+          <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Lưu thay đổi</button>
+        </form>
+      </div>
+    </div>
+    <div id="goal-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-medium text-gray-900">Thêm/Cập nhật Mục tiêu tháng</h3><button id="close-goal-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <form id="goal-form" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div><label for="goal-month" class="block text-sm font-medium text-gray-700 mb-1">Month</label><select id="goal-month" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></select></div>
+            <div><label for="goal-year" class="block text-sm font-medium text-gray-700 mb-1">Year</label><input type="number" id="goal-year" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+          </div>
+          <div><label for="goal-product" class="block text-sm font-medium text-gray-700 mb-1">Mục tiêu sản phẩm</label><input type="number" id="goal-product" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+          <div><label for="goal-video" class="block text-sm font-medium text-gray-700 mb-1">Mục tiêu video</label><input type="number" id="goal-video" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+          <div id="category-goals-container" class="space-y-2 pt-2 border-t"><label class="block text-sm font-medium text-gray-700 mb-1">Mục tiêu danh mục (Tùy chọn)</label></div>
+          <button type="button" id="add-category-goal-btn" class="text-sm text-blue-600 hover:underline">+ Thêm mục tiêu danh mục</button>
+          <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Lưu mục tiêu</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Goal Modal -->
+    <div id="edit-goal-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+           <h3 class="text-lg font-medium text-gray-900">Edit Monthly Goal</h3>
+           <button id="close-edit-goal-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+             <i data-lucide="x" class="w-5 h-5"></i>
+           </button>
+         </div>
+        <form id="edit-goal-form" class="space-y-4">
+          <input type="hidden" id="edit-goal-id">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="edit-goal-month-display" class="block text-sm font-medium text-gray-700 mb-1">Month</label>
+              <input type="text" id="edit-goal-month-display" class="block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+              <input type="hidden" id="edit-goal-month">
+            </div>
+            <div>
+              <label for="edit-goal-year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <input type="number" id="edit-goal-year" class="block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+            </div>
+          </div>
+          <div>
+            <label for="edit-goal-product" class="block text-sm font-medium text-gray-700 mb-1">Mục tiêu sản phẩm</label>
+            <input type="number" id="edit-goal-product" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+          </div>
+          <div>
+            <label for="edit-goal-video" class="block text-sm font-medium text-gray-700 mb-1">Mục tiêu video</label>
+            <input type="number" id="edit-goal-video" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+          </div>
+          <div id="edit-category-goals-container" class="space-y-2 pt-2 border-t">
+             <label class="block text-sm font-medium text-gray-700 mb-1">Category Goals</label>
+             <!-- Category goals will be added here -->
+          </div>
+          <button type="button" id="edit-add-category-goal-btn" class="text-sm text-blue-600 hover:underline">+ Thêm mục tiêu danh mục</button>
+
+          <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+
+
+  </div> <!-- Close #app div -->
+
+  <script type="module" src="/js/main.js"></script>
+  <script>
+    // Initialize Lucide icons after DOM is ready and potentially after modals are shown
+    lucide.createIcons();
+  </script>
+</body>
+</html>
+
+
+
+    <!-- Tag Manager Modal -->
+    <div id="tag-manager-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Manage Tags</h3>
+          <button id="close-tag-manager-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Left Column: Tag List & Search -->
+          <div>
+            <h4 class="text-md font-semibold mb-2">Existing Tags</h4>
+            <div class="mb-2">
+              <input type="text" id="tag-search-input" placeholder="Search tags..." class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+            </div>
+            <!-- Optional: Add Sort controls here -->
+            <div id="tag-manager-list" class="space-y-1 max-h-60 overflow-y-auto border p-2 rounded">
+              <!-- Tags will be loaded here by JS -->
+              <p class="text-sm text-gray-500">Loading tags...</p>
+            </div>
+          </div>
+
+          <!-- Right Column: Add/Edit Form -->
+          <div>
+            <form id="tag-manager-form" class="space-y-3 bg-gray-50 p-4 rounded border">
+              <h4 id="tag-form-title" class="text-md font-semibold">Thêm thẻ mới</h4>
+              <input type="hidden" id="tag-edit-id">
+              <div>
+                <label for="tag-name-input" class="block text-sm font-medium text-gray-700 mb-1">Tag Name</label>
+                <input type="text" id="tag-name-input" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+              </div>
+              <div>
+                <label for="tag-color-input" class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                <div class="flex items-center gap-2">
+                   <input type="color" id="tag-color-picker" class="p-1 h-10 w-14 block bg-white border border-gray-300 rounded-md cursor-pointer" value="#cccccc">
+                   <input type="text" id="tag-color-input" pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$" title="Hex color code e.g., #RRGGBB or #RGB" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="#cccccc">
+                </div>
+              </div>
+              <div class="flex gap-2 pt-2">
+                 <button type="submit" id="tag-save-btn" class="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Lưu thẻ</button>
+                 <button type="button" id="tag-cancel-edit-btn" class="hidden flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Hủy chỉnh sửa</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Filter Modal -->
+    <div id="filter-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      <div class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Lọc sản phẩm</h3>
+          <button id="close-filter-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <!-- Date Range Quick Select -->
+        <div id="date-quick-select" class="flex flex-wrap gap-2 mb-4 px-4">
+          <button data-range="today" class="date-range-btn px-2 py-1 text-xs border rounded hover:bg-gray-100">Hôm nay</button>
+          <button data-range="yesterday" class="date-range-btn px-2 py-1 text-xs border rounded hover:bg-gray-100">Hôm qua</button>
+          <button data-range="last7" class="date-range-btn px-2 py-1 text-xs border rounded hover:bg-gray-100">7 ngày qua</button>
+          <button data-range="last30" class="date-range-btn px-2 py-1 text-xs border rounded hover:bg-gray-100">30 ngày qua</button>
+          <button data-range="all" class="date-range-btn px-2 py-1 text-xs border rounded hover:bg-gray-100">Tất cả ngày</button>
+        </div>
+
+        <div id="product-filters-content" class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="filter-purchased" class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                <select id="filter-purchased" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">Tất cả</option>
+                  <option value="true">Đã mua</option>
+                  <option value="false">Đang chờ</option>
+                </select>
+              </div>
+               <div>
+                <label for="filter-tags-input" class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                <input id="filter-tags-input" name="filter-tags-input" placeholder="Type or select tags..." class="block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div>
+                <label for="filter-start-date" class="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+                 <input type="date" id="filter-start-date" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div>
+                <label for="filter-end-date" class="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+                <input type="date" id="filter-end-date" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div>
+                <label for="filter-max-videos" class="block text-sm font-medium text-gray-700 mb-1">Số video tối đa</label>
+                <input type="number" id="filter-max-videos" min="0" placeholder="Ví dụ: 10" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+               <div>
+                <label for="filter-search" class="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm (URL/Ghi chú)</label>
+                <input type="text" id="filter-search" placeholder="Từ khóa..." class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div class="col-span-full flex justify-end space-x-2 mt-4">
+                 <button id="apply-filters-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 h-10 py-2 px-4">Áp dụng bộ lọc</button>
+                 <button id="reset-filters-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 h-10 py-2 px-4">Đặt lại</button>
+              </div>
+            </div>
+          </div>
+      </div>
+    </div>

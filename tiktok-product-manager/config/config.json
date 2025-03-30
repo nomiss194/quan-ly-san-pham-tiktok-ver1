@@ -1,0 +1,23 @@
+{
+  "development": {
+    "dialect": "sqlite",
+    "storage": "./database/tiktok.db",
+    "migrationStorageTableName": "sequelize_meta",
+    "migrationsPath": "./server/migrations",
+    "modelsPath": "./server/models"
+  },
+  "test": {
+    "dialect": "sqlite",
+    "storage": ":memory:",
+    "migrationStorageTableName": "sequelize_meta",
+    "migrationsPath": "./server/migrations",
+    "modelsPath": "./server/models"
+  },
+  "production": {
+    "dialect": "sqlite",
+    "storage": "./database/tiktok.db",
+    "migrationStorageTableName": "sequelize_meta",
+    "migrationsPath": "./server/migrations",
+    "modelsPath": "./server/models"
+  }
+}
