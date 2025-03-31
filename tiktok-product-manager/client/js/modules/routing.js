@@ -105,6 +105,13 @@ export function setupTabNavigation() {
             // For now, assuming it's called once during setup.
             tabElement.replaceWith(tabElement.cloneNode(true)); // Simple way to remove all listeners
             document.getElementById(tabId)?.addEventListener('click', (e) => {
+                // --- Close mobile sidebar if open ---
+                const sidebar = document.getElementById('sidebar');
+                const sidebarOverlay = document.getElementById('sidebar-overlay');
+                sidebar?.classList.add('-translate-x-full');
+                sidebarOverlay?.classList.add('hidden');
+                // --- End close mobile sidebar ---
+
                 e.preventDefault();
                 const targetPath = tabId === 'dashboard-tab' ? '/' : `/${tabId.split('-')[0]}`;
                 if (window.location.pathname !== targetPath) {

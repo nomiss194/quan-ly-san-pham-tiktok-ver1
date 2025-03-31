@@ -118,20 +118,6 @@
 
     /* Further adjustments for tablet portrait / mobile */
     @media (max-width: 768px) {
-        /* Make sidebar icon-only */
-        aside.w-64 {
-             width: 4rem; /* w-16 */
-        }
-        aside nav a span {
-             display: none; /* Hide text labels */
-        }
-        aside nav a {
-             justify-content: center; /* Center icons */
-             padding-left: 0.5rem; /* px-2 */
-             padding-right: 0.5rem; /* px-2 */
-        }
-    }
-
 
         /* Allow wrapping for the main toolbar container if still too tight */
         #products-content > .flex.items-center.justify-between {
@@ -177,11 +163,16 @@
     <!-- Dashboard Section (hidden by default) -->
     <div id="dashboard-section" class="hidden min-h-screen flex flex-col">
       <header class="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6">
+        <!-- Mobile Menu Button -->
+        <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-600 hover:text-gray-900">
+          <i data-lucide="menu" class="h-6 w-6"></i>
+        </button>
         <div class="flex items-center gap-2"><span class="text-lg font-semibold">TikTok Manager</span></div>
         <div class="ml-auto flex items-center gap-4"><button id="logout-btn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4"><i data-lucide="log-out" class="mr-2 h-4 w-4"></i>Đăng xuất</button></div>
       </header>
       <div class="flex flex-1">
-        <aside class="hidden border-r bg-gray-50 md:block w-64">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed top-0 left-0 h-full z-20 w-64 border-r bg-gray-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:block">
           <div class="flex h-full max-h-screen flex-col gap-2">
             <div class="flex-1 py-2">
               <nav class="grid items-start px-2 text-sm font-medium lg:px-4">
@@ -193,6 +184,9 @@
             </div>
           </div>
         </aside>
+        <!-- Sidebar Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden"></div>
+
         <main class="flex-1 p-4 md:p-6">
           <div id="dashboard-content">
             <!-- Stats Cards -->
@@ -372,24 +366,34 @@
       </div>
     </div>
     <div id="edit-product-modal" class="fixed inset-0 z-50 hidden bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-      <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+      <div class="relative mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
         <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-medium text-gray-900">Sửa sản phẩm</h3><button id="close-edit-modal-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"><i data-lucide="x" class="w-5 h-5"></i></button></div>
-        <form id="edit-product-form" class="space-y-4">
+        <form id="edit-product-form">
           <input type="hidden" id="edit-product-id">
-          <div><label for="edit-product-url" class="block text-sm font-medium text-gray-700 mb-1">URL TikTok</label><input type="url" id="edit-product-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
-          <div>
-            <label for="edit-product-image-url" class="block text-sm font-medium text-gray-700 mb-1">Hình ảnh (Dán từ Clipboard hoặc Tải lên)</label>
-            <input type="text" id="edit-product-image-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Dán hình ảnh vào đây hoặc sử dụng nút tải lên"> {/* Changed type to text */}
-            <input type="file" id="edit-product-image-upload" accept="image/*" class="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-            <img id="edit-product-image-preview" src="" alt="Image Preview" class="product-image mt-2 w-full h-auto max-h-72 object-contain hidden cursor-pointer" title="Click to zoom">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"> <!-- Grid container -->
+            <!-- Left Column: Image -->
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700">Hình ảnh</label>
+              <div>
+                <label for="edit-product-image-url" class="block text-xs font-medium text-gray-500 mb-1">URL hoặc Dán/Tải lên</label>
+                <input type="text" id="edit-product-image-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="Dán hình ảnh vào đây hoặc sử dụng nút tải lên">
+                <input type="file" id="edit-product-image-upload" accept="image/*" class="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              </div>
+              <img id="edit-product-image-preview" src="" alt="Image Preview" class="product-image w-full h-auto max-h-96 object-contain rounded border border-gray-200 hidden cursor-pointer" title="Click to zoom">
+            </div>
+
+            <!-- Right Column: Other fields -->
+            <div class="space-y-4">
+              <div><label for="edit-product-url" class="block text-sm font-medium text-gray-700 mb-1">URL TikTok</label><input type="url" id="edit-product-url" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required></div>
+              <div><label for="edit-product-notes" class="block text-sm font-medium text-gray-700 mb-1">Ghi chú (Tùy chọn)</label><textarea id="edit-product-notes" rows="4" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+              <div>
+                <label for="edit-product-tags-input" class="block text-sm font-medium text-gray-700 mb-1">Thẻ (Tùy chọn)</label>
+                <input id="edit-product-tags-input" name="edit-product-tags-input" placeholder="Type or select tags..." class="block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+              </div>
+              <div><label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label><select id="edit-product-purchased" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"><option value="false">Đang chờ</option><option value="true">Đã mua</option></select></div>
+            </div>
           </div>
-          <div><label for="edit-product-notes" class="block text-sm font-medium text-gray-700 mb-1">Ghi chú (Tùy chọn)</label><textarea id="edit-product-notes" rows="3" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea></div>
-          <!-- <div><label for="edit-product-tags" class="block text-sm font-medium text-gray-700 mb-1">Tags (Optional, comma-separated)</label><input type="text" id="edit-product-tags" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></div> -->
-          <div>
-            <label for="edit-product-tags-input" class="block text-sm font-medium text-gray-700 mb-1">Thẻ (Tùy chọn)</label>
-            <input id="edit-product-tags-input" name="edit-product-tags-input" placeholder="Type or select tags..." class="block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-          </div>
-           <div><label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label><select id="edit-product-purchased" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"><option value="false">Đang chờ</option><option value="true">Đã mua</option></select></div>
+          <!-- Save Button - Placed outside the grid -->
           <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Lưu thay đổi</button>
         </form>
       </div>

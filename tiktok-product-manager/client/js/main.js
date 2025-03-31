@@ -123,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
       await addProduct({ url, image_url, notes, tags });
       closeModal('add-product-modal');
       if (window.location.pathname === '/products') loadProductsList();
-      alert('Sản phẩm đã được thêm thành công!');
     } catch (error) {
       alert(error.message || 'Failed to add product');
     }
@@ -150,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await updateProduct(id, { url, image_url, notes, tags, purchased });
       closeModal('edit-product-modal');
       if (window.location.pathname === '/products') loadProductsList();
-      alert('Sản phẩm đã được cập nhật thành công!');
+
     } catch (error) {
       alert(error.message || 'Failed to update product');
     }
@@ -305,6 +304,31 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('apply-filters-btn')?.addEventListener('click', applyFilters);
   document.getElementById('reset-filters-btn')?.addEventListener('click', resetFilters);
 
+
+
+  // --- Mobile Sidebar Toggle ---
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+  mobileMenuBtn?.addEventListener('click', () => {
+    sidebar?.classList.toggle('-translate-x-full');
+    sidebarOverlay?.classList.toggle('hidden');
+  });
+
+  sidebarOverlay?.addEventListener('click', () => {
+    sidebar?.classList.add('-translate-x-full');
+    sidebarOverlay?.classList.add('hidden');
+  });
+
+  // Optional: Close sidebar when a nav link is clicked
+  sidebar?.querySelectorAll('nav a')?.forEach(link => {
+    link.addEventListener('click', () => {
+        sidebar?.classList.add('-translate-x-full');
+        sidebarOverlay?.classList.add('hidden');
+        // Note: handleRoute will be called by the existing tab navigation setup
+    });
+  });
 
 
   // --- Tag Manager Listeners (Now handled in setupTagManagerListeners) ---

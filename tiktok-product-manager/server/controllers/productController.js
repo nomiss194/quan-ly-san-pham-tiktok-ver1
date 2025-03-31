@@ -199,7 +199,22 @@ exports.updateProduct = async (req, res) => {
       include: [Tag]
     });
 
-    res.json(updatedProduct);
+    // --- START: Tính toán lại số đếm sau khi cập nhật ---
+    const [pendingCount, purchasedCount] = await Promise.all([
+        Product.count({ where: { user_id: userId, deleted_at: null, purchased: false } }),
+        Product.count({ where: { user_id: userId, deleted_at: null, purchased: true } })
+    ]);
+    const totalCount = pendingCount + purchasedCount;
+    // --- END: Tính toán lại số đếm ---
+
+    res.json({
+      product: updatedProduct, // Trả về sản phẩm đã cập nhật
+      stats: { // Thêm đối tượng stats
+        total: totalCount,
+        pending: pendingCount,
+        purchased: purchasedCount
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

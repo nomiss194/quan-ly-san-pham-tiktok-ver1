@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:17-alpine # Sử dụng phiên bản Alpine nhẹ hơn
+    container_name: tiktok_db
+    restart: always
+    env_file:
+      - ./tiktok-product-manager/.env.docker # Lấy biến POSTGRES_* từ đây
+    volumes:
+      - db_data:/var/lib/postgresql/data # Sử dụng named volume quản lý bởi Docker
+    networks:
+      - tiktok-net
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+  app:
+    build:
+      context: ./tiktok-product-manager
+      dockerfile: Dockerfile
+    container_name: tiktok_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy # Chờ DB healthcheck thành công
+    env_file:
+      - ./tiktok-product-manager/.env.docker # Lấy biến DB_* và JWT_SECRET từ đây
+    volumes:
+      - uploads_data:/usr/src/app/server/public/uploads # Sử dụng named volume
+    networks:
+      - tiktok-net
+    # Không expose port ra ngoài, Nginx sẽ xử lý
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: tiktok_nginx
+    restart: always
+    depends_on:
+      - app
+    ports:
+      - "8080:80" # Map port 8080 của host vào port 80 của Nginx
+      # - "443:443" # Sẵn sàng cho HTTPS sau này
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro # Map file cấu hình Nginx
+      - ./tiktok-product-manager/client:/usr/share/nginx/html/client:ro # Map thư mục client
+      - uploads_data:/usr/share/nginx/html/uploads:ro # Map volume uploads (read-only cho Nginx)
+      # - ./certs:/etc/nginx/certs:ro # Sẵn sàng cho SSL certs sau này
+    networks:
+      - tiktok-net
+
+networks:
+  tiktok-net:
+    driver: bridge
+
+volumes:
+  db_data: # Volume lưu dữ liệu PostgreSQL
+    # Docker sẽ tự quản lý volume này trên máy local
+  uploads_data: # Volume lưu file uploads
+    # Docker sẽ tự quản lý volume này trên máy local

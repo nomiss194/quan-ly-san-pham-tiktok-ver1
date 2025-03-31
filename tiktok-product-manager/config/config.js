@@ -24,22 +24,30 @@ module.exports = {
   },
   production: {
     // Use DATABASE_URL for production environments (common practice on hosting platforms like Heroku, Render)
-    use_env_variable: "DATABASE_URL",
+    // use_env_variable: "DATABASE_URL",
+ // Comment out or remove this line
     dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true, // Enforce SSL for production
-        rejectUnauthorized: false // Adjust based on your hosting provider's SSL requirements
-      }
-    },
+    // Remove dialectOptions for internal Docker network connection (usually no SSL needed)
+    // dialectOptions: {
+    //   ssl: {
+    //     require: true,
+    //     rejectUnauthorized: false
+    //   }
+    // },
     migrationStorageTableName: "sequelize_meta"
+, // <-- Thêm dấu phẩy ở đây
     // Optional fallback if DATABASE_URL is not set (uncomment and configure if needed)
-    /*
+    // Add individual environment variables like in development
     username: process.env.PROD_DB_USER,
     password: process.env.PROD_DB_PASSWORD,
     database: process.env.PROD_DB_NAME,
     host: process.env.PROD_DB_HOST,
     port: process.env.PROD_DB_PORT,
-    */
+    // Use the same variables as defined in .env.docker for consistency
+    username: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    host: process.env.DB_HOST, // This should be 'db' from .env.docker
+    port: process.env.DB_PORT,
   }
 };

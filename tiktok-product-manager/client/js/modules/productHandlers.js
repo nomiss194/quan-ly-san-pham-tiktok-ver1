@@ -10,7 +10,7 @@ import {
     fetchApi // Needed for fetching product details for inline tag editing
 } from './api.js';
 import { loadProductsList } from './dataLoaders.js'; // Assuming loadProductsList will be here
-import { renderDashboardStats } from './uiRender.js'; // Assuming renderDashboardStats is here
+// import { renderDashboardStats } from './uiRender.js'; // No longer needed here directly
 import { openEditModal } from './modal.js'; // Assuming openEditModal is here
 
 
@@ -174,7 +174,7 @@ export async function initializeInlineEditing(containerElement) {
             templates: {
                 tag: function(tagData) {
                     // *** DEBUG LOG ***
-                    console.log('[Tagify Template] Rendering tag with data:', tagData);
+                    // console.log('[Tagify Template] Rendering tag with data:', tagData); // Reduced logging
                     // *** END DEBUG LOG ***
                     const bgColor = tagData.color || '#cccccc'; // Use tag color or default gray
                     const textColor = getContrastYIQ(bgColor); // Calculate contrast color (getContrastYIQ must be defined in scope)
@@ -240,16 +240,23 @@ export async function initializeInlineEditing(containerElement) {
                         const finalTagNames = currentTagNames; // Send the current state
 
                         console.log(`[handleInlineTagBlur] Updating product ${productId} with tags:`, finalTagNames);
-                        await updateProduct(productId, { tags: finalTagNames });
+                        // Use the updateProduct API which now returns stats
+                        const updateResult = await updateProduct(productId, { tags: finalTagNames });
 
                         // Update the originalTags dataset with the new state AFTER successful save
-                        const updatedProduct = await fetchApi(`/api/products/${productId}`); // Re-fetch to get IDs and confirm state
-                        if (updatedProduct && updatedProduct.Tags) {
-                            const newTagsJson = safeJSONStringify(updatedProduct.Tags);
+                        // Use the product data returned from the update API
+                        if (updateResult && updateResult.product && updateResult.product.Tags) {
+                            const newTagsJson = safeJSONStringify(updateResult.product.Tags);
                             inputEl.dataset.originalTags = newTagsJson;
                             console.log(`Tags saved successfully for product ${productId}. New originalTags:`, newTagsJson);
                             // Optionally re-render tagify if needed, though usually not necessary if names match
                             // tagify.loadOriginalValues(updatedProduct.Tags.map(t => t.name));
+
+                            // Update stats counts if the API returned them
+                            if (updateResult.stats) {
+                                updateStatCountUI(updateResult.stats);
+                            }
+
                         } else {
                              console.warn(`Could not verify tag save for product ${productId}, originalTags dataset might be stale.`);
                              inputEl.dataset.originalTags = safeJSONStringify(currentTagData.map(t => ({name: t.value}))); // Update with current names as fallback
@@ -302,6 +309,24 @@ export async function initializeInlineEditing(containerElement) {
         });
         textarea.dataset.inlineListenersAttached = 'true'; // Mark as attached
     });
+
+    // 4. Add listeners for video log date changes
+    const videoLogDateInputs = containerElement.querySelectorAll('.video-log-date');
+    videoLogDateInputs.forEach(dateInput => {
+        // Avoid adding listeners multiple times
+        if (dateInput.dataset.dateChangeListenerAttached) return;
+
+        dateInput.addEventListener('change', (event) => {
+            const section = event.target.closest('.video-log-section');
+            if (!section) return;
+            const productId = section.dataset.productId;
+            const countInput = section.querySelector('.video-log-count');
+            if (productId && countInput) {
+                handleVideoLogDateChange(productId, event.target, countInput);
+            }
+        });
+        dateInput.dataset.dateChangeListenerAttached = 'true'; // Mark as attached
+    });
 }
 
 
@@ -317,9 +342,11 @@ export async function handleAddVideoLog(productId, dateElement, countElement) {
 
     try {
         await addVideoLog(productId, date, count);
-        alert(`Log saved: ${count} videos for ${date}.`);
+        // Instead of full reload, maybe just update the total count on the card?
+        // Or rely on the next full loadProductsList call
+        // For now, keep the reload to ensure consistency, but consider optimizing later
         loadProductsList(); // Refresh product list
-        if (window.location.pathname === '/') renderDashboardStats(); // Refresh dashboard if visible
+        // if (window.location.pathname === '/') renderDashboardStats(); // Refresh dashboard if visible
     } catch (error) {
         alert(error.message || 'Failed to add video log.');
     }
@@ -346,19 +373,42 @@ export async function handleDeleteProduct(productId) {
     if (!confirm('Bạn có chắc chắn muốn chuyển sản phẩm này vào thùng rác?')) return;
     try {
         await deleteProductApi(productId); // Use renamed API function
-        await loadProductsList(); // Refresh product list
-        if (window.location.pathname === '/') renderDashboardStats(); // Refresh dashboard if visible
-        alert('Sản phẩm đã được chuyển vào thùng rác.');
+        // Instead of full reload, remove the card and update stats
+        const productCard = document.querySelector(`div.product-card[data-product-id="${productId}"]`);
+        if (productCard) {
+            productCard.remove(); // Remove the card from the DOM
+        }
+        // Fetch new stats to update counts
+        // This assumes fetchProducts can return only stats without products
+        // Or we need a dedicated stats endpoint
+        // For simplicity now, let's keep the reload, but ideally optimize this
+        await loadProductsList(); // Refresh product list for now
+        // if (window.location.pathname === '/') renderDashboardStats(); // Refresh dashboard if visible
+
     } catch (error) {
         alert(error.message || 'Failed to delete product.');
     }
 }
 
+// Helper function to update stat counts in the UI
+function updateStatCountUI(stats) {
+    if (!stats) return;
+    const totalCountEl = document.getElementById('stat-total-count');
+    const pendingCountEl = document.getElementById('stat-pending-count');
+    const purchasedCountEl = document.getElementById('stat-purchased-count');
+
+    // Update total count (optional, as it shouldn't change on status toggle or delete)
+    // if (totalCountEl) totalCountEl.textContent = stats.total ?? 0;
+    if (pendingCountEl) pendingCountEl.textContent = stats.pending ?? 0;
+    if (purchasedCountEl) purchasedCountEl.textContent = stats.purchased ?? 0;
+}
+
+
 // --- Event Delegation Handler for Products List (Table and Cards) ---
 // This single handler manages clicks on various buttons/elements within the product list container
 export async function handleProductListActions(event) {
     const target = event.target; // Define target first
-    // console.log('[handleProductListActions] Click detected. Target:', target); // Log removed
+    // console.log('[handleProductListActions] Click detected. Target:', target);
 
     // Find the closest relevant element (button, span, or the card/row itself for context)
     const actionButton = target.closest('button[data-action]');
@@ -368,11 +418,13 @@ export async function handleProductListActions(event) {
     if (!actionElement) return; // Exit if the click wasn't on an actionable element
 
     const action = actionElement.dataset.action;
-    const productItem = target.closest('tr[data-product-id], div.product-card[data-product-id]'); // Find parent row or card
+    // Find parent card specifically for product actions
+    const productItem = actionElement.closest('div.product-card[data-product-id]');
     const productId = productItem?.dataset.productId;
-    // console.log('[handleProductListActions] Action element found:', actionElement, 'Action:', action, 'ProductId:', productId); // Log removed
+    // console.log('[handleProductListActions] Action element found:', actionElement, 'Action:', action, 'ProductId:', productId);
 
-    if (!productId) {
+    // Actions like 'edit', 'delete', 'toggle-purchase', 'save-video-log' require a productId from the card
+    if (['edit', 'delete', 'toggle-purchase', 'save-video-log'].includes(action) && !productId) {
         console.warn("Could not find product ID for action:", action, target);
         return;
     }
@@ -385,7 +437,7 @@ export async function handleProductListActions(event) {
         handleDeleteProduct(productId);
     }
     else if (action === 'save-video-log') {
-        // This action only exists in the table view
+        // Handles saving video log from card view
         const dateInput = productItem.querySelector('.video-log-date');
         const countInput = productItem.querySelector('.video-log-count');
         if (dateInput && countInput) {
@@ -398,34 +450,67 @@ export async function handleProductListActions(event) {
         const currentStatus = actionElement.dataset.currentStatus === 'true';
         const newStatus = !currentStatus;
         try {
-            await updateProduct(productId, { purchased: newStatus });
-            // Update both table cell and card badge if they exist
-            const statusElements = document.querySelectorAll(`[data-product-id="${productId}"] [data-action="toggle-purchase"]`);
-            statusElements.forEach(el => {
-                el.textContent = newStatus ? 'Đã mua' : 'Đang chờ';
-                el.dataset.currentStatus = newStatus;
-                el.classList.remove(
-                    currentStatus ? 'bg-green-100' : 'bg-yellow-100',
-                    currentStatus ? 'text-green-800' : 'text-yellow-800',
-                    currentStatus ? 'hover:bg-green-200' : 'hover:bg-yellow-200'
-                );
-                el.classList.add(
-                    newStatus ? 'bg-green-100' : 'bg-yellow-100',
-                    newStatus ? 'text-green-800' : 'text-yellow-800',
-                    newStatus ? 'hover:bg-green-200' : 'hover:bg-yellow-200'
-                );
-            });
+            // Store the API response which now includes product and stats
+            const updateResult = await updateProduct(productId, { purchased: newStatus });
 
-            if (window.location.pathname === '/') renderDashboardStats();
+            if (!updateResult || !updateResult.product) {
+                throw new Error("Invalid response from server during status update.");
+            }
+
+            // --- START: Update UI based on confirmed status from server ---
+            const confirmedNewStatus = updateResult.product.purchased; // Use status from server response
+
+            // Update the clicked status element
+            actionElement.textContent = confirmedNewStatus ? 'Đã mua' : 'Đang chờ';
+            actionElement.dataset.currentStatus = confirmedNewStatus; // Update data-attribute with confirmed status
+            // Update classes based on confirmed status
+            const currentStatusForClass = !confirmedNewStatus; // Status *before* the change
+            actionElement.classList.remove(
+                currentStatusForClass ? 'stat-btn-purchased' : 'stat-btn-pending',
+                'hover:opacity-80' // Adjust class removal/addition as needed
+            );
+            actionElement.classList.add(
+                confirmedNewStatus ? 'stat-btn-purchased' : 'stat-btn-pending',
+                'hover:opacity-80' // Adjust class removal/addition as needed
+            );
+            // --- END: Update UI based on confirmed status ---
+
+            // --- START: Cập nhật số đếm từ stats trả về ---
+            if (updateResult.stats) {
+                updateStatCountUI(updateResult.stats); // Use the helper function
+            } else {
+                console.warn("API response did not include stats for updating counts.");
+                // Optionally, fetch stats separately as a fallback?
+                // await loadProductsList(); // Or trigger a stats-only refresh if available
+            }
+            // --- END: Cập nhật số đếm ---
+
+            // --- START: Ẩn card nếu không khớp bộ lọc active ---
+            const activeButton = document.querySelector('.stat-filter-btn[data-active="true"]');
+            const activeFilterStatus = activeButton ? activeButton.dataset.filterStatus : null; // null hoặc '' cho 'All'
+
+            // Chỉ ẩn nếu đang lọc theo trạng thái cụ thể (không phải 'All')
+            if (productItem && activeFilterStatus !== null && activeFilterStatus !== '') {
+                // So sánh trạng thái mới (đã xác nhận từ server) với bộ lọc
+                if (String(confirmedNewStatus) !== activeFilterStatus) {
+                    console.log(`Hiding product card ${productId} because new status (${confirmedNewStatus}) does not match active filter (${activeFilterStatus})`);
+                    productItem.classList.add('hidden'); // Ẩn card
+                }
+            }
+            // --- END: Ẩn card ---
+
         } catch (error) {
+            console.error("Failed to update product status:", error); // Log the error
             alert(error.message || 'Failed to update status');
+            // Optionally revert UI changes here if needed
         }
     }
     else if (action === 'toggle-actions-menu') {
         // Specific to card view
-        const menu = productItem.querySelector('.card-actions-menu');
+        const menu = productItem?.querySelector('.card-actions-menu'); // Use optional chaining
         if (menu) {
             menu.classList.toggle('hidden');
+            // Optional: Add logic to close other open menus
         }
     }
 }

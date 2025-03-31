@@ -4,7 +4,8 @@
 // ==================================
 
 import { fetchApi } from './api.js'; // Needed for fetchAndRenderGoalStats
-import { initializeInlineEditing } from './productHandlers.js'; // Import the new function
+import { initializeInlineEditing, handleVideoLogDateChange } from './productHandlers.js'; // Import the new function
+// and date change handler
 import { initImageZoomListeners } from './imageZoom.js'; // Import image zoom functionality
 
 // Helper function to determine text color based on background hex color
@@ -183,18 +184,34 @@ export async function renderProducts(products) { // Made async to handle potenti
                 </div>
             </div>
             <a href="${product.url}" target="_blank" class="text-sm font-medium text-blue-600 hover:underline truncate">${product.url}</a>
+            <div class="flex items-center justify-between"> <!-- Added justify-between -->
             <span
-              class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer w-fit ${product.purchased ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'}"
-              data-action="toggle-purchase"
-              data-current-status="${product.purchased}"
-            >
+ data-action="toggle-purchase" data-product-id="${productId}"
+ data-current-status="${product.purchased}"
+                  class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors duration-150 ease-in-out ${product.purchased
+                    ? 'stat-btn-purchased hover:opacity-80'
+                    : 'stat-btn-pending hover:opacity-80'
+                  }">
               ${product.purchased ? 'Đã mua' : 'Đang chờ'}
             </span>
+            <!-- Moved Tạo lúc here -->
+            <span class="text-xs text-gray-500">Tạo lúc: ${formatRelativeCreatedAt(product.created_at)}</span>
+ <!-- Ensure this is the second element -->
+            </div> <!-- End wrapper -->
+             <div class="video-log-section mt-3 pt-3 border-t border-gray-200 space-y-2" data-product-id="${productId}">
+                 <!-- Moved Tổng video here and removed label -->
+                 <span class="inline-flex items-center text-xs text-gray-500 mb-1"> <!-- Added mb-1 for spacing -->
+                     <i data-lucide="film" class="h-3 w-3 mr-1"></i>
+                     Tổng video: ${product.video_count ?? 0}
+                 </span>
+                 <div class="flex items-center space-x-2">
+                     <input type="date" class="video-log-date px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-auto" value="${today}">
+                     <input type="number" min="0" placeholder="Số lượng" class="video-log-count px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-20">
+                     <button data-action="save-video-log" class="px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Lưu</button>
+                 </div>
+             </div>
             <p class="text-xs text-gray-500 mt-1">
-                Tạo lúc: ${formatRelativeCreatedAt(product.created_at)}
-            </p>
             <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Thẻ</label>
                 <input
                     class="inline-tagify-input block w-full text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     data-product-id="${productId}"
@@ -217,6 +234,17 @@ export async function renderProducts(products) { // Made async to handle potenti
         // console.log(`[renderProducts] Appending card for product ${productId} to cardsContainer`); // DEBUG LOG
         cardsContainer.appendChild(card);
         cardCount++; // DEBUG LOG
+
+        // --- Load initial video log count for today ---
+        const dateInput = card.querySelector('.video-log-date');
+        const countInput = card.querySelector('.video-log-count');
+        if (dateInput && countInput && dateInput.value) { // Check if date input has a value (today's date)
+            // Use setTimeout to allow the main rendering thread to finish before fetching
+            setTimeout(() => {
+                handleVideoLogDateChange(productId, dateInput, countInput);
+            }, 0);
+        }
+        // --- End Load initial video log count ---
 
     });
     // --- End Render Loop ---
@@ -314,7 +342,9 @@ export async function renderDashboardStats() {
                           <img src="${product.image_url || 'https://via.placeholder.com/120'}" alt="Sản phẩm" class="product-image w-full h-full object-cover cursor-pointer" title="Nhấn để phóng to">
                         </div>
                         <div class="flex-1 min-w-0 overflow-hidden">
-                          <a href="${product.url}" target="_blank" class="text-sm font-medium hover:underline" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${product.url}</a>
+                          <a href="${product.url}" target="_blank" class="text-sm font-medium hover:underline" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${product.url}"> <!-- Added title attribute for full URL on hover -->
+                            ${(product.url && product.url.length > 50) ? product.url.substring(0, 50) + '...' : product.url} <!-- Changed limit to 50 -->
+                          </a>
                           <div class="flex items-center flex-wrap gap-1 mt-1">
                              ${product.Tags?.map(t => `<span class="text-xs px-2 py-0.5 rounded" style="background-color: ${t.color || '#cccccc'}; color: ${getContrastYIQ(t.color || '#cccccc')}; border: 1px solid #ccc;">${t.name}</span>`).join('') || ''}
                           </div>
